@@ -24,11 +24,7 @@ const SLOTS = [
 // Business rules
 const EARLY_MINUTES = 5;
 function isAllowedDate(dateObj) {
-  // 2026 only + Mon-Sat
-  const yearOk = dateObj.getFullYear() === 2026;
-  const day = dateObj.getDay(); // Sun=0..Sat=6
-  const monToSat = day >= 1 && day <= 6;
-  return yearOk && monToSat;
+  return true;
 }
 
 function todayISO(dateObj) {
@@ -81,7 +77,7 @@ app.get("/api/meta", (req, res) => {
     localDate: todayISO(now),
     allowedNow: isAllowedDate(now),
     slots: SLOTS,
-    rules: { year: 2026, days: "Mon-Sat", earlyMinutes: EARLY_MINUTES }
+    rules: { days: "Every day", earlyMinutes: EARLY_MINUTES }
   });
 });
 
@@ -141,7 +137,7 @@ app.post("/api/tick", async (req, res) => {
   if (!isAllowedDate(now)) {
     return res.status(403).json({
       error: "Not allowed today",
-      detail: "This tracker is configured for Mon-Sat in year 2026 only."
+      detail: "This tracker is not accepting ticks today."
     });
   }
 

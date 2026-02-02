@@ -24,6 +24,7 @@ let meta = null;
 
 function displayDays(days) {
   if (days === "Mon-Sat") return "ចន្ទ-សៅរ៍";
+  if (days === "Every day") return "រាល់ថ្ងៃ";
   return days;
 }
 
@@ -51,7 +52,7 @@ async function loadMeta() {
     earlyLine.textContent = `អាចចុះវត្តមានមុន ${meta.rules.earlyMinutes} នាទី។`;
   }
   if (!meta.allowedNow) {
-    setMsg("ថ្ងៃនេះមិនអនុញ្ញាត (Mon-Sat ឆ្នាំ 2026)។", "warn");
+    setMsg("ថ្ងៃនេះមិនអនុញ្ញាតទេ។", "warn");
   } else {
     setMsg("រួចរាល់។ សូមចុចម៉ោងរបស់អ្នក។", "ok");
   }
