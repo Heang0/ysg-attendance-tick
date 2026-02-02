@@ -12,6 +12,18 @@ const DEFAULT_EMPLOYEES = [
   "Savath"
 ];
 
+const TIME_ZONE = process.env.APP_TZ || process.env.TZ || "Asia/Phnom_Penh";
+const TZ_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false
+});
+
 function initFirebase() {
   if (getApps().length) return;
   const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -20,6 +32,39 @@ function initFirebase() {
   }
   const serviceAccount = JSON.parse(json);
   initializeApp({ credential: cert(serviceAccount) });
+}
+
+function getTzParts(dateObj) {
+  const parts = TZ_FORMAT.formatToParts(dateObj);
+  const map = {};
+  parts.forEach(p => { map[p.type] = p.value; });
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    second: Number(map.second)
+  };
+}
+
+function getTimeZoneOffsetMs(dateObj) {
+  const parts = getTzParts(dateObj);
+  const utcFromParts = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  return utcFromParts - dateObj.getTime();
+}
+
+function makeZonedDate(parts, hour, minute, second = 0) {
+  const utcGuess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, hour, minute, second));
+  const offset = getTimeZoneOffsetMs(utcGuess);
+  return new Date(utcGuess.getTime() - offset);
 }
 
 function normalizeTick(t) {
@@ -53,7 +98,7 @@ const ADMIN_KEY = process.env.ADMIN_KEY || "";
 const SLOTS = [
   { key: "08:00", label: "08:00 AM" },
   { key: "12:00", label: "12:00 PM" },
-  { key: "12:30", label: "12:30 PM" },
+  { key: "12:20", label: "12:20 PM" },
   { key: "17:30", label: "05:30 PM" },
 ];
 
@@ -63,24 +108,22 @@ function isAllowedDate(dateObj) {
   return true;
 }
 
-function todayISO(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const d = String(dateObj.getDate()).padStart(2, "0");
+function todayISOFromParts(parts) {
+  const y = parts.year;
+  const m = String(parts.month).padStart(2, "0");
+  const d = String(parts.day).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-function slotDateTime(dateObj, slotKey) {
+function slotDateTime(parts, slotKey) {
   const [hh, mm] = slotKey.split(":").map(Number);
-  const dt = new Date(dateObj);
-  dt.setHours(hh, mm, 0, 0);
-  return dt;
+  return makeZonedDate(parts, hh, mm, 0);
 }
 
-function canTickNow(now, slotKey) {
-  const slotTime = slotDateTime(now, slotKey);
+function canTickNow(nowUtc, slotKey, parts) {
+  const slotTime = slotDateTime(parts, slotKey);
   const earliest = new Date(slotTime.getTime() - EARLY_MINUTES * 60 * 1000);
-  return { allowed: now >= earliest, earliest, slotTime };
+  return { allowed: nowUtc >= earliest, earliest, slotTime };
 }
 
 async function getEmployees() {
@@ -113,12 +156,13 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/api/meta", async (req, res) => {
   await seedEmployeesIfEmpty();
   const now = new Date();
+  const parts = getTzParts(now);
   res.json({
     serverTime: now.toISOString(),
-    localDate: todayISO(now),
+    localDate: todayISOFromParts(parts),
     allowedNow: isAllowedDate(now),
     slots: SLOTS,
-    rules: { days: "Every day", earlyMinutes: EARLY_MINUTES }
+    rules: { days: "Every day", earlyMinutes: EARLY_MINUTES, timeZone: TIME_ZONE }
   });
 });
 
@@ -132,7 +176,8 @@ app.get("/api/ticks/today", async (req, res) => {
   if (!employee) return res.status(400).json({ error: "Missing employee" });
 
   const now = new Date();
-  const date = todayISO(now);
+  const parts = getTzParts(now);
+  const date = todayISOFromParts(parts);
 
   initFirebase();
   const db = getFirestore();
@@ -173,6 +218,7 @@ app.post("/api/tick", async (req, res) => {
   if (!employee || !slot) return res.status(400).json({ error: "Missing employee or slot" });
 
   const now = new Date();
+  const parts = getTzParts(now);
   if (!isAllowedDate(now)) {
     return res.status(403).json({
       error: "Not allowed today",
@@ -183,17 +229,17 @@ app.post("/api/tick", async (req, res) => {
   const slotOk = SLOTS.some(s => s.key === slot);
   if (!slotOk) return res.status(400).json({ error: "Invalid slot" });
 
-  const timeCheck = canTickNow(now, slot);
+  const timeCheck = canTickNow(now, slot, parts);
   if (!timeCheck.allowed) {
     return res.status(403).json({
       error: "Too early for this slot",
-      detail: ` អ្នកអាចគ្រីសបាន ${EARLY_MINUTES}នាទី មុនពេលម៉ោងកំណត់.`,
+      detail: `You can tick ${EARLY_MINUTES} minutes before the slot time.`,
       earliest: timeCheck.earliest.toISOString(),
       slotTime: timeCheck.slotTime.toISOString()
     });
   }
 
-  const date = todayISO(now);
+  const date = todayISOFromParts(parts);
   const timestamp = now.toISOString();
 
   if (!(await employeeExists(employee))) {
