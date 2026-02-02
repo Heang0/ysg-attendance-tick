@@ -28,6 +28,21 @@ function displayDays(days) {
   return days;
 }
 
+function formatTimeInZone(iso, timeZone) {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timeZone || "Asia/Phnom_Penh",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    }).format(new Date(iso));
+  } catch {
+    return new Date(iso).toLocaleTimeString();
+  }
+}
+
 function setMsg(text, kind = "info") {
   msgDiv.className = "msg " + kind;
   msgDiv.textContent = text;
@@ -176,7 +191,8 @@ async function onTick(slot) {
     if (e?.status === 409) return setMsg("ម៉ោងនេះបានចុះរួចហើយ។", "warn");
     if (e?.status === 403) {
       const detail = e?.body?.detail ? ` ${e.body.detail}` : "";
-      const earliest = e?.body?.earliest ? ` Earliest: ${new Date(e.body.earliest).toLocaleTimeString()}.` : "";
+      const earliestTime = e?.body?.earliest ? formatTimeInZone(e.body.earliest, meta?.rules?.timeZone) : "";
+      const earliest = earliestTime ? ` Earliest: ${earliestTime}.` : "";
       return setMsg(`មិនអនុញ្ញាត។${detail}${earliest}`, "warn");
     }
     setMsg(`កំហុស៖ ${e?.body?.error || "មានបញ្ហា"}`, "bad");

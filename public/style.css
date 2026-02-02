@@ -102,11 +102,11 @@ label {
 }
 
 select {
-  min-width: 240px;
-  padding: 10px 12px;
+  min-width: 280px;
+  padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid #d9dbe7;
-  font-size: 14px;
+  font-size: 16px;
   background: #fff;
 }
 
