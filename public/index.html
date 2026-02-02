@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Attendance Tick</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">YSG</div>
+        <div>
+          <h1>កត់វត្តមាន(ពូកែភ្លេច)</h1>
+          <p class="sub">ផ្ទាំងគ្រប់គ្រងសម្រាប់ចុះវត្តមានដោយខ្លួនឯង</p>
+        </div>
+      </div>
+      <div class="headerMeta">
+        <div id="dateLine">—</div>
+        <div id="ruleLine" class="muted">—</div>
+      </div>
+    </header>
+
+    <section class="card hero">
+      <div class="row">
+        <div>
+          <label for="employee">ឈ្មោះរបស់អ្នក</label>
+          <select id="employee"></select>
+        </div>
+        <div class="hint">
+          ចុចម៉ោងត្រឹមត្រូវ។ <span id="earlyLine">អាចចុះវត្តមានមុនបន្តិច។</span>
+        </div>
+      </div>
+
+      <div class="slots" id="slots"></div>
+
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="grid">
+      <section class="card">
+        <h2>វត្តមានថ្ងៃនេះ</h2>
+        <div id="today" class="today">សូមជ្រើសឈ្មោះដើម្បីមើលវត្តមាន។</div>
+      </section>
+
+      <section class="card">
+        <h2>ប្រវត្តិ</h2>
+        <div class="historyControls">
+          <label for="historyDate">កាលបរិច្ឆេទ</label>
+          <input id="historyDate" type="date" />
+          <button id="historyClear" type="button" class="ghost">មើលទាំងអស់</button>
+        </div>
+        <div id="history" class="history">សូមជ្រើសឈ្មោះដើម្បីមើលប្រវត្តិ។</div>
+      </section>
+    </section>
+
+    <footer class="footer">
+      <small class="muted">
+        គន្លឹះ៖ កុំភ្លេចស្កេនប្រយ័ត្នដាច់30ឡាដឹងនៅhehe
+      </small>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

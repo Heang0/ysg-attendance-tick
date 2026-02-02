@@ -1,0 +1,230 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Khmer:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #f2f4fb;
+  --bg-2: #eef1ff;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --primary: #2f6bff;
+  --primary-2: #1f4fd6;
+  --accent: #0ea5e9;
+  --ring: rgba(47, 107, 255, 0.25);
+  --shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Noto Sans Khmer", "DM Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1000px 360px at 10% -10%, #dde6ff 0%, transparent 60%),
+    radial-gradient(900px 400px at 90% -5%, #d7f1ff 0%, transparent 60%),
+    var(--bg);
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(140deg, var(--primary), var(--accent));
+  color: #fff;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.2px;
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.headerMeta {
+  text-align: right;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  border: 1px solid #e6e9fb;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f9faff 100%);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+select {
+  min-width: 240px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d9dbe7;
+  font-size: 14px;
+  background: #fff;
+}
+
+input[type="date"] {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d9dbe7;
+  font-size: 14px;
+  background: #fff;
+}
+
+.historyControls {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ghost {
+  border: 1px solid #d9dbe7;
+  background: #f7f8ff;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.ghost:hover {
+  border-color: #cfd5ff;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.muted { color: var(--muted); }
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.slot {
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid #e5e7f2;
+  background: #f8f9ff;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.slot:hover {
+  border-color: #cfd5ff;
+  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.slot:focus {
+  outline: 2px solid var(--ring);
+}
+
+.slotTime {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.slotKey {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.msg {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 14px;
+}
+
+.msg.ok { background: #ecfdf3; border-color: #bbf7d0; }
+.msg.info { background: #eef2ff; border-color: #c7d2fe; }
+.msg.warn { background: #fffbeb; border-color: #fde68a; }
+.msg.bad { background: #fef2f2; border-color: #fecaca; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.table th, .table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.footer {
+  margin-top: 18px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .headerMeta { text-align: left; }
+  .slots { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; }
+  select, input[type="date"] { width: 100%; min-width: 0; }
+}
