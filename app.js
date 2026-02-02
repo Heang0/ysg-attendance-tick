@@ -1,9 +1,45 @@
 const express = require("express");
-const { sql } = require("@vercel/postgres");
 const path = require("path");
+const { initializeApp, cert, getApps } = require("firebase-admin/app");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 
-if (process.env.DATABASE_URL && !process.env.POSTGRES_URL) {
-  process.env.POSTGRES_URL = process.env.DATABASE_URL;
+const DEFAULT_EMPLOYEES = [
+  "Heang",
+  "Riya",
+  "Kdey",
+  "Chi Vorn",
+  "Nith",
+  "Savath"
+];
+
+function initFirebase() {
+  if (getApps().length) return;
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!json) {
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON");
+  }
+  const serviceAccount = JSON.parse(json);
+  initializeApp({ credential: cert(serviceAccount) });
+}
+
+function normalizeTick(t) {
+  const ts = t?.timestamp;
+  const iso = ts && typeof ts.toDate === "function" ? ts.toDate().toISOString() : ts;
+  return { ...t, timestamp: iso };
+}
+
+async function seedEmployeesIfEmpty() {
+  initFirebase();
+  const db = getFirestore();
+  const snap = await db.collection("employees").limit(1).get();
+  if (!snap.empty) return;
+
+  const batch = db.batch();
+  DEFAULT_EMPLOYEES.forEach(name => {
+    const ref = db.collection("employees").doc(name);
+    batch.set(ref, { name });
+  });
+  await batch.commit();
 }
 
 const app = express();
@@ -48,13 +84,17 @@ function canTickNow(now, slotKey) {
 }
 
 async function getEmployees() {
-  const result = await sql`SELECT name FROM employees ORDER BY name ASC`;
-  return result.rows.map(r => r.name);
+  initFirebase();
+  const db = getFirestore();
+  const snapshot = await db.collection("employees").orderBy("name").get();
+  return snapshot.docs.map(d => d.get("name"));
 }
 
 async function employeeExists(name) {
-  const result = await sql`SELECT 1 FROM employees WHERE name = ${name} LIMIT 1`;
-  return result.rowCount > 0;
+  initFirebase();
+  const db = getFirestore();
+  const doc = await db.collection("employees").doc(name).get();
+  return doc.exists;
 }
 
 function csvEscape(s) {
@@ -70,7 +110,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // ====== API ======
-app.get("/api/meta", (req, res) => {
+app.get("/api/meta", async (req, res) => {
+  await seedEmployeesIfEmpty();
   const now = new Date();
   res.json({
     serverTime: now.toISOString(),
@@ -93,14 +134,17 @@ app.get("/api/ticks/today", async (req, res) => {
   const now = new Date();
   const date = todayISO(now);
 
-  const result = await sql`
-    SELECT employee, date::text AS date, slot, timestamp, ip, user_agent AS "userAgent"
-    FROM ticks
-    WHERE employee = ${employee} AND date = ${date}
-    ORDER BY timestamp ASC
-  `;
+  initFirebase();
+  const db = getFirestore();
+  const snapshot = await db.collection("ticks")
+    .where("employee", "==", employee)
+    .where("date", "==", date)
+    .get();
 
-  res.json({ date, employee, ticks: result.rows });
+  const rows = snapshot.docs
+    .map(d => normalizeTick(d.data()))
+    .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+  res.json({ date, employee, ticks: rows });
 });
 
 app.get("/api/ticks/history", async (req, res) => {
@@ -110,23 +154,18 @@ app.get("/api/ticks/history", async (req, res) => {
   const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
   const date = req.query.date;
 
-  const rows = date
-    ? await sql`
-        SELECT employee, date::text AS date, slot, timestamp, ip, user_agent AS "userAgent"
-        FROM ticks
-        WHERE employee = ${employee} AND date = ${date}
-        ORDER BY timestamp DESC
-        LIMIT ${limit}
-      `
-    : await sql`
-        SELECT employee, date::text AS date, slot, timestamp, ip, user_agent AS "userAgent"
-        FROM ticks
-        WHERE employee = ${employee}
-        ORDER BY timestamp DESC
-        LIMIT ${limit}
-      `;
+  initFirebase();
+  const db = getFirestore();
+  let query = db.collection("ticks")
+    .where("employee", "==", employee);
+  if (date) query = query.where("date", "==", date);
+  const snapshot = await query.get();
+  const rows = snapshot.docs
+    .map(d => normalizeTick(d.data()))
+    .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+    .slice(0, limit);
 
-  res.json({ employee, date: date || null, limit, ticks: rows.rows });
+  res.json({ employee, date: date || null, limit, ticks: rows });
 });
 
 app.post("/api/tick", async (req, res) => {
@@ -148,7 +187,7 @@ app.post("/api/tick", async (req, res) => {
   if (!timeCheck.allowed) {
     return res.status(403).json({
       error: "Too early for this slot",
-      detail: `You can tick ${EARLY_MINUTES} minutes before the slot time.`,
+      detail: ` អ្នកអាចគ្រីសបាន ${EARLY_MINUTES}នាទី មុនពេលម៉ោងកំណត់.`,
       earliest: timeCheck.earliest.toISOString(),
       slotTime: timeCheck.slotTime.toISOString()
     });
@@ -158,24 +197,43 @@ app.post("/api/tick", async (req, res) => {
   const timestamp = now.toISOString();
 
   if (!(await employeeExists(employee))) {
-    return res.status(400).json({ error: "Unknown employee. Add it in the database." });
+    return res.status(400).json({ error: "Unknown employee. Add it in Firebase." });
   }
 
+  initFirebase();
+  const db = getFirestore();
   const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress;
   const userAgent = req.headers["user-agent"] || "";
 
-  const insert = await sql`
-    INSERT INTO ticks (employee, date, slot, timestamp, ip, user_agent)
-    VALUES (${employee}, ${date}, ${slot}, ${timestamp}, ${ip}, ${userAgent})
-    ON CONFLICT (employee, date, slot) DO NOTHING
-    RETURNING employee, date::text AS date, slot, timestamp, ip, user_agent AS "userAgent"
-  `;
+  const existsSnap = await db.collection("ticks")
+    .where("employee", "==", employee)
+    .where("date", "==", date)
+    .where("slot", "==", slot)
+    .limit(1)
+    .get();
 
-  if (insert.rowCount === 0) {
+  if (!existsSnap.empty) {
     return res.status(409).json({ error: "Already ticked for this slot today" });
   }
 
-  res.json({ ok: true, record: insert.rows[0] });
+  const record = {
+    employee,
+    date,
+    slot,
+    timestamp: Timestamp.fromDate(new Date(timestamp)),
+    ip,
+    userAgent
+  };
+
+  await db.collection("ticks").add(record);
+
+  res.json({
+    ok: true,
+    record: {
+      ...record,
+      timestamp
+    }
+  });
 });
 
 // ====== ADMIN / EXPORT ======
@@ -187,8 +245,10 @@ function requireAdmin(req, res, next) {
 }
 
 app.get("/admin", requireAdmin, async (req, res) => {
-  const totalResult = await sql`SELECT COUNT(*)::int AS total FROM ticks`;
-  const total = totalResult.rows[0]?.total || 0;
+  initFirebase();
+  const db = getFirestore();
+  const snap = await db.collection("ticks").count().get();
+  const total = snap.data().count || 0;
   res.type("html").send(`
     <html>
       <head><title>Admin - Attendance Tick</title><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
@@ -209,13 +269,16 @@ app.get("/api/export.csv", requireAdmin, async (req, res) => {
   const lines = [header.join(",")];
 
   // Sort stable for readability
-  const rows = await sql`
-    SELECT employee, date::text AS date, slot, timestamp, ip, user_agent AS "userAgent"
-    FROM ticks
-    ORDER BY date ASC, employee ASC, slot ASC
-  `;
+  initFirebase();
+  const db = getFirestore();
+  const snapshot = await db.collection("ticks").get();
+  const sorted = snapshot.docs.map(d => normalizeTick(d.data())).sort((a, b) => {
+    const k1 = `${a.date} ${a.employee} ${a.slot}`;
+    const k2 = `${b.date} ${b.employee} ${b.slot}`;
+    return k1.localeCompare(k2);
+  });
 
-  for (const t of rows.rows) {
+  for (const t of sorted) {
     const row = header.map(h => csvEscape(t[h]));
     lines.push(row.join(","));
   }

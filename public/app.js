@@ -47,7 +47,8 @@ async function loadMeta() {
   meta = await api("/api/meta");
   dateLine.textContent = `ថ្ងៃនេះ៖ ${meta.localDate}`;
   const earlyText = meta.rules.earlyMinutes ? ` | អាចមុន ${meta.rules.earlyMinutes} នាទី` : "";
-  ruleLine.textContent = `ច្បាប់៖ ${displayDays(meta.rules.days)} | ${meta.rules.year}${earlyText}`;
+  const yearText = meta.rules.year ? ` | ${meta.rules.year}` : "";
+  ruleLine.textContent = `${displayDays(meta.rules.days)}${yearText}${earlyText}`;
   if (earlyLine && meta.rules.earlyMinutes) {
     earlyLine.textContent = `អាចចុះវត្តមានមុន ${meta.rules.earlyMinutes} នាទី។`;
   }
@@ -104,6 +105,15 @@ function renderTodayTicks(ticks) {
   `;
 }
 
+function updateSlotStates(ticks) {
+  const done = new Set(ticks.map(t => t.slot));
+  slotsDiv.querySelectorAll(".slot").forEach(btn => {
+    const isDone = done.has(btn.dataset.slot);
+    btn.classList.toggle("slot-done", isDone);
+    btn.disabled = isDone;
+  });
+}
+
 function renderHistory(ticks) {
   if (!ticks.length) return `<div class="muted">មិនទាន់មានប្រវត្តិទេ។</div>`;
   return `
@@ -136,12 +146,19 @@ async function refreshToday() {
   if (!employee) return;
   const data = await api(`/api/ticks/today?employee=${encodeURIComponent(employee)}`);
   todayDiv.innerHTML = renderTodayTicks(data.ticks);
+  updateSlotStates(data.ticks);
   await refreshHistory();
 }
 
 async function onTick(slot) {
   const employee = employeeSel.value;
   if (!employee) return setMsg("សូមជ្រើសឈ្មោះជាមុន។", "warn");
+
+  const btn = slotsDiv.querySelector(`[data-slot="${slot}"]`);
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("slot-loading");
+  }
 
   try {
     const out = await api("/api/tick", {
@@ -150,6 +167,11 @@ async function onTick(slot) {
     });
     setMsg(`បានរក្សាទុក៖ ${employee} ចុះវត្តមាន ${slot} ម៉ោង ${new Date(out.record.timestamp).toLocaleTimeString()}`, "ok");
     await refreshToday();
+    if (btn) {
+      btn.classList.remove("slot-loading");
+      btn.classList.add("slot-success");
+      setTimeout(() => btn.classList.remove("slot-success"), 1400);
+    }
   } catch (e) {
     if (e?.status === 409) return setMsg("ម៉ោងនេះបានចុះរួចហើយ។", "warn");
     if (e?.status === 403) {
@@ -158,6 +180,11 @@ async function onTick(slot) {
       return setMsg(`មិនអនុញ្ញាត។${detail}${earliest}`, "warn");
     }
     setMsg(`កំហុស៖ ${e?.body?.error || "មានបញ្ហា"}`, "bad");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("slot-loading");
+    }
   }
 }
 
